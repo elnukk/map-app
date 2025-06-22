@@ -92,7 +92,7 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="info-pane">
-        <h1>Early Colonial Farmlands</h1>
+        <h1>Cape Colony Freehold Land Grants</h1>
         <p className="description">
           This interactive map is a digital restoration of the document 
           <em>"The Southwestern Cape Colony, 1657–1750: Freehold Land Grants"</em>.
@@ -174,7 +174,7 @@ export default function App() {
             className="accordion-header"
             onClick={() => setShowFarms(!showFarms)}
           >
-            🌾 List All Farms {showFarms ? '▲' : '▼'}
+            🌾 List All Lands {showFarms ? '▲' : '▼'}
           </div>
           {showFarms && (
             <div className="accordion-body">
