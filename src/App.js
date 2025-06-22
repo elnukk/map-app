@@ -21,6 +21,10 @@ export default function App() {
   const [selectedBounds, setSelectedBounds] = useState(null);
   const [year, setYear] = useState(1900);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
+  const [showOwners, setShowOwners] = useState(false);
+  const [showFarms, setShowFarms] = useState(false);
+  const [highlightedOwner, setHighlightedOwner] = useState(null);
+  const [rankBySize, setRankBySize] = useState(true);
 
   const filteredLocations = useMemo(() => {
     if (!locations.features) return locations;
@@ -37,6 +41,35 @@ export default function App() {
       features: filtered,
     };
   }, [locations, year, yearFilterEnabled]);
+
+  const uniqueOwners = useMemo(() => {
+    const ownerCounts = {};
+    filteredLocations.features.forEach((f) => {
+      const owner = f.properties?.owner;
+      if (owner) {
+        ownerCounts[owner] = (ownerCounts[owner] || 0) + 1;
+      }
+    });
+    return Object.entries(ownerCounts)
+      .map(([owner, count]) => ({ owner, count }))
+      .sort((a, b) => a.owner.localeCompare(b.owner));
+  }, [filteredLocations]);
+
+  const uniqueFarms = useMemo(() => {
+    const farms = filteredLocations.features.map((f) => {
+      const name = f.properties?.name;
+      const owner = f.properties?.owner;
+      const bounds = L.geoJSON(f).getBounds();
+      const area = bounds.getEast() - bounds.getWest(); // proxy
+      return { name, owner, area };
+    });
+
+    const filtered = farms.filter((f) => f.name);
+
+    return rankBySize
+      ? filtered.sort((a, b) => a.area - b.area)
+      : filtered.sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredLocations, rankBySize]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -58,69 +91,133 @@ export default function App() {
 
   return (
     <div className="app-container">
-<div className="info-pane">
-  <h1>Early Colonial Farmlands</h1>
-  <p className="description">
-    This interactive map is a digital restoration of the historical document 
-    <em>"The Southwestern Cape Colony, 1657–1750: Freehold Land Grants"</em>.
-    The original scanned map was georeferenced using QGIS, with each farm polygon manually digitized and enriched with metadata such as farm name, owner, and grant date.
-    <br /><br />
-    The result is an explorable visualization of colonial settlement patterns in the Western Cape. Users can search for historical farms, filter entries by year, and learn more about the people and processes that shaped the early colony.
-    <br /><br />
-    <em>by Elanu Karakus</em>
-  </p>
+      <div className="info-pane">
+        <h1>Early Colonial Farmlands</h1>
+        <p className="description">
+          This interactive map is a digital restoration of the document 
+          <em>"The Southwestern Cape Colony, 1657–1750: Freehold Land Grants"</em>.
+          The scanned map was georeferenced using QGIS, with each farm polygon manually digitized and enriched with metadata such as farm name, owner, and grant date.
+          <br /><br />
+          The result is an explorable visualization of colonial settlement patterns in the Western Cape. Users can search for historical farms, filter entries by year, and learn more about the people and processes that shaped the early colony.
+          <br /><br />
+          <em>by Elanu Karakus</em>
+        </p>
 
-  <form onSubmit={handleSearch} className="search-form">
-    <input
-      type="text"
-      placeholder="Search farm..."
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-    />
-    <button type="submit">Go</button>
-  </form>
+        <form onSubmit={handleSearch} className="search-form">
+          <input
+            type="text"
+            placeholder="Search farm..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button type="submit">Go</button>
+        </form>
 
-  <div className="timeline">
-    <label>
-      <input
-        type="checkbox"
-        checked={yearFilterEnabled}
-        onChange={(e) => setYearFilterEnabled(e.target.checked)}
-      />
-      Enable year filter
-    </label>
+        {/* Accordion: Year Filter */}
+        <div className="accordion-section">
+          <div
+            className="accordion-header"
+            onClick={() => setYearFilterEnabled(!yearFilterEnabled)}
+          >
+            📅 Filter by Year {yearFilterEnabled ? '▲' : '▼'}
+          </div>
+          {yearFilterEnabled && (
+            <div className="accordion-body">
+              <label>Year: {year}</label>
+              <input
+                type="range"
+                min="1650"
+                max="1780"
+                step="1"
+                value={year}
+                onChange={(e) => setYear(parseInt(e.target.value))}
+              />
+            </div>
+          )}
+        </div>
 
-    {yearFilterEnabled && (
-      <>
-        <label>Year: {year}</label>
-        <input
-          type="range"
-          min="1650"
-          max="1780"
-          step="1"
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value))}
-        />
-      </>
-    )}
-  </div>
-</div>
+        {/* Accordion: Owners */}
+        <div className="accordion-section">
+          <div
+            className="accordion-header"
+            onClick={() => {
+              setShowOwners(!showOwners);
+              if (showOwners) setHighlightedOwner(null);
+            }}
+          >
+            👤 List All Owners {showOwners ? '▲' : '▼'}
+          </div>
+          {showOwners && (
+            <div className="accordion-body">
+              <ul className="scrollable-list">
+                {uniqueOwners.map(({ owner, count }, idx) => (
+                  <li
+                    key={idx}
+                    onClick={() => setHighlightedOwner(owner)}
+                    style={{
+                      cursor: 'pointer',
+                      fontWeight: owner === highlightedOwner ? 'bold' : 'normal',
+                      color: owner === highlightedOwner ? '#d62828' : 'black',
+                    }}
+                  >
+                    {owner} ({count})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Accordion: Farms */}
+        <div className="accordion-section">
+          <div
+            className="accordion-header"
+            onClick={() => setShowFarms(!showFarms)}
+          >
+            🌾 List All Farms {showFarms ? '▲' : '▼'}
+          </div>
+          {showFarms && (
+            <div className="accordion-body">
+              <label style={{ display: 'block', marginBottom: '5px' }}>
+                <input
+                  type="checkbox"
+                  checked={rankBySize}
+                  onChange={(e) => setRankBySize(e.target.checked)}
+                />
+                Rank by size (ascending)
+              </label>
+
+              <ul className="scrollable-list">
+                {uniqueFarms.map(({ name, owner, area }, idx) => (
+                  <li key={idx}>
+                    {name} – {owner || 'Unknown'} (size: {area.toFixed(2)})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="map-pane">
-        <MapContainer center={[-33.7249, 18.7241]} zoom={10} style={{ height: '100%' }}>
-
+        <MapContainer center={[-33.749, 18.7241]} zoom={10} style={{ height: '100%' }}>
           <TileLayer
+            // Replace below URL if you'd like a historical-style basemap
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="© OpenStreetMap contributors"
           />
           <GeoJSON
             key={yearFilterEnabled ? year : 'all'}
             data={filteredLocations}
-            style={{
-              color: '#663300',
-              weight: 2,
-              fillColor: '#ffcc99',
-              fillOpacity: 0.4,
+            style={(feature) => {
+              const isHighlighted =
+                highlightedOwner && feature.properties?.owner === highlightedOwner;
+              return {
+                color: isHighlighted ? '#ff0000' : '#663300',
+                weight: isHighlighted ? 3 : 2,
+                fillColor: isHighlighted ? '#ffaaaa' : '#ffcc99',
+                fillOpacity: 0.5,
+              };
             }}
             onEachFeature={(feature, layer) => {
               const { name, date, owner } = feature.properties || {};
