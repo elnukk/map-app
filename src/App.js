@@ -190,7 +190,7 @@ export default function App() {
               <ul className="scrollable-list">
                 {uniqueFarms.map(({ name, owner, area }, idx) => (
                   <li key={idx}>
-                    {name} – {owner || 'Unknown'} (size: {area.toFixed(2)})
+                    {name} – {owner || 'Unknown'} 
                   </li>
                 ))}
               </ul>
